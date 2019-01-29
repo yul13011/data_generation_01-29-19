@@ -1,7 +1,7 @@
 #!/bin/bash
-#SBATCH -p debug
+#SBATCH -p general
 #SBATCH -o compute.out
-#SBATCH -n 12
+#SBATCH -n 50
 
 echo -n > compute.out
 

@@ -5,11 +5,10 @@ library(parallel)
 
 generate_data <- function(iter, params) {
 library(foreign)
-# Set random seed #
-set.seed(1234566 + iter)
 
+n.sim <- 50
 
-datasets = data.frame(condition = integer(),
+datasets = data.frame(replicate = integer(),
                       schid = double(),
                       studentid = double(),
                       y_l = double(),
@@ -23,8 +22,10 @@ datasets = data.frame(condition = integer(),
                       v1_l = double(),
                       prob_schl_long = double())
 
-for (j in seq_along(params)) {
-with(params[j, ], {
+with(params[iter, ], {
+for (j in 1:n.sim) {
+# Set random seed #
+set.seed(1234566 + iter)
 # Step 1. Generate data #################################################################
 
 # Step 1.1. Generate school level and student level covariates # 
@@ -197,15 +198,12 @@ dataset=NULL
   prob_schl_long=rep(prob_schl,K) # make it into long format 
   
   # Combine all variables into a single dataset and write to file 
-  dataset=data.frame(cbind(condition=j,schid,studentid,y_l,y1_l,y0_l,TE_l,s1_l,s2_l,z2_l,x1_l,v1_l,prob_schl_long))
+  dataset=data.frame(cbind(replicate=j,schid,studentid,y_l,y1_l,y0_l,TE_l,s1_l,s2_l,z2_l,x1_l,v1_l,prob_schl_long))
   datasets = rbind(datasets, dataset)
-})}
+}})
   file.name=paste0("dataset",iter,".dta")
   write.dta(datasets,file.name)
 }
-
-# Set random seed #
-n.sim=50
 
 # Below are coefficients for the MLM treatment effect # 
 # All other coefficients that are in the draft but not listed here are either 0 or 1 #
@@ -236,5 +234,5 @@ params <- expand.grid(pi30 = 1,
                       tau11 = c(0.2, 2))
 
 cl <- makeCluster(Sys.getenv()["SLURM_NTASKS"], type = "MPI")
-clusterApplyLB(cl, 1:n.sim, generate_data, params)
+clusterApplyLB(cl, 1:seq_along(params), generate_data, params)
 stopCluster(cl)
