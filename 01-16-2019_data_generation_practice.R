@@ -1,12 +1,12 @@
 # This is the second practice coding for dissertation simulation study #
 # In this coding, only one school level and one student level variable is simualted #
 # Note all conditions are estimators are programmed # 
-library(parallel)
+library(BiocParallel)
 
 generate_data <- function(iter, params) {
 library(foreign)
 
-n.sim <- 50
+n.sim <- 2
 
 datasets = data.frame(replicate = integer(),
                       schid = double(),
@@ -21,9 +21,20 @@ datasets = data.frame(replicate = integer(),
                       x1_l = double(),
                       v1_l = double(),
                       prob_schl_long = double())
+schid = params[iter, "schid"]
+studentid = params[iter, "studentid"]
+y_l = params[iter, "y_l"]
+y1_l = params[iter, "y1_l"]
+y0_l = params[iter, "y0_l"]
+TE_l = params[iter, "TE_l"]
+s1_l = params[iter, "s1_l"]
+s2_l = params[iter, "s2_l"]
+z2_l = params[iter, "z2_l"]
+x1_l = params[iter, "x1_l"]
+v1_l = params[iter, "v1_l"]
+prob_schl_long = params[iter, "prob_schl_long"]
 
-with(params[iter, ], {
-for (j in 1:n.sim) {
+    for (j in 1:n.sim) {
 # Set random seed #
 set.seed(1234566 + j)
 # Step 1. Generate data #################################################################
@@ -36,7 +47,9 @@ set.seed(1234566 + j)
 # Generate school-level V1 is continuous N(0, 1)
 # Generate student level covariates x1 is continuous N(V1_h, 1)
 H=2000
-K=rep(NA,H)
+K=as.integer(rnorm(H,200,80))
+K[K < 10] = 10
+K[K > 700] = 700
 v1=rep(NA,H)
 v2=rep(NA,H)
 x1=NULL
@@ -69,13 +82,13 @@ y_l=NULL
 dataset=NULL
 
   for (h in 1:H){
-    K[h]=as.integer(rnorm(H,200,80)) 
     # k= # number of student per school, k~N(600, 270), min = 30 and max = 4000
-    if(K[h]<10) {
-      K[h]=10}
-    if(K[h]>700) {
-      K[h]=700
-    }
+      if (K[h]<10) {
+          K[h] = 10
+      }
+      if (K[h] > 700) {
+          K[h] = 700
+      }
     v1[h]=rnorm(1,0,1) # v1~N(0,1)
     v2[h]=rbinom(1,1,0.5)
     x1[[h]]=rep(NA,K[h]) # student level variable x1
@@ -157,7 +170,6 @@ dataset=NULL
       }
     }
   }
-  
   ## mean(s2)  
   ## hist(s1_mean[complete.cases(s1_mean)])
   ## mean(s1_mean[complete.cases(s1_mean)])
@@ -198,11 +210,14 @@ dataset=NULL
   prob_schl_long=rep(prob_schl,K) # make it into long format 
   
   # Combine all variables into a single dataset and write to file 
-  dataset=data.frame(cbind(replicate=j,schid,studentid,y_l,y1_l,y0_l,TE_l,s1_l,s2_l,z2_l,x1_l,v1_l,prob_schl_long))
-  datasets = rbind(datasets, dataset)
-}})
-  file.name=paste0("dataset",iter,".dta")
-  write.dta(datasets,file.name)
+        dataset=data.frame(cbind(replicate=j,schid,studentid,y_l,y1_l,y0_l,TE_l,s1_l,s2_l,z2_l,x1_l,v1_l,prob_schl_long))
+        datasets = rbind(datasets, dataset)
+        if (j == n.sim) {
+            file.name=paste0("dataset",iter,".dta")
+            write.dta(datasets,file.name)
+        }
+    }
+return(NULL)
 }
 
 # Below are coefficients for the MLM treatment effect # 
@@ -233,6 +248,6 @@ params <- expand.grid(pi30 = 1,
                       tau10 = c(0.2, 2),
                       tau11 = c(0.2, 2))
 
-cl <- makeCluster(Sys.getenv()["SLURM_NTASKS"], type = "MPI")
-clusterApplyLB(cl, 1:seq_along(params), generate_data, params)
-stopCluster(cl)
+register(MulticoreParam(workers = 12))
+#bplapply(1:seq_along(nrow(params)), generate_data, params = params)
+generate_data(1, params)
