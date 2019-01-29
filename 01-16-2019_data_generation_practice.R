@@ -1,9 +1,12 @@
 # This is the second practice coding for dissertation simulation study #
 # In this coding, only one school level and one student level variable is simualted #
 # Note all conditions are estimators are programmed # 
+library(parallel)
+
+generate_data <- function(iter) {
 library(foreign)
 # Set random seed #
-set.seed(1234567)
+set.seed(1234566 + iter)
 
 # Step 1. Generate data #################################################################
 
@@ -14,7 +17,6 @@ set.seed(1234567)
 # Students per school is based on FL data  
 # Generate school-level V1 is continuous N(0, 1)
 # Generate student level covariates x1 is continuous N(V1_h, 1)
-n.sim=50
 H=2000
 K=rep(NA,H)
 v1=rep(NA,H)
@@ -66,7 +68,6 @@ s1_l=NULL
 y_l=NULL
 dataset=NULL
 
-for (j in 1:n.sim){
   for (h in 1:H){
     K[h]=as.integer(rnorm(H,200,80)) 
     # k= # number of student per school, k~N(600, 270), min = 30 and max = 4000
@@ -198,6 +199,16 @@ for (j in 1:n.sim){
   
   # Combine all variables into a single dataset and write to file 
   dataset=data.frame(cbind(schid,studentid,y_l,y1_l,y0_l,TE_l,s1_l,s2_l,z2_l,x1_l,v1_l,prob_schl_long))
-  file.name=paste0("dataset",j,".dta")
+  file.name=paste0("dataset",iter,".dta")
   write.dta(dataset,file.name)
+  message("Wrote ", iter)
+  return(NULL)
 }
+
+
+# Set random seed #
+n.sim=50
+
+cl <- makeCluster(Sys.getenv()["SLURM_NTASKS"], type = "MPI")
+clusterApplyLB(cl, 1:n.sim, generate_data)
+stopCluster(cl)
