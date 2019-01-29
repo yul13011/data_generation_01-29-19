@@ -3,11 +3,28 @@
 # Note all conditions are estimators are programmed # 
 library(parallel)
 
-generate_data <- function(iter) {
+generate_data <- function(iter, params) {
 library(foreign)
 # Set random seed #
 set.seed(1234566 + iter)
 
+
+datasets = data.frame(condition = integer(),
+                      schid = double(),
+                      studentid = double(),
+                      y_l = double(),
+                      y1_l = double(),
+                      y0_l = double(),
+                      TE_l = double(),
+                      s1_l = double(),
+                      s2_l = double(),
+                      z2_l = double(),
+                      x1_l = double(),
+                      v1_l = double(),
+                      prob_schl_long = double())
+
+for (j in seq_along(params)) {
+with(params[j, ], {
 # Step 1. Generate data #################################################################
 
 # Step 1.1. Generate school level and student level covariates # 
@@ -24,33 +41,15 @@ v2=rep(NA,H)
 x1=NULL
 y=NULL
 
-# Below are coefficients for the MLM treatment effect # 
-# All other coefficients that are in the draft but not listed here are either 0 or 1 #
-pi30=1 # unconditional effect of treatment effect (TE) #
-pi31=2 # impact of v1 on TE
-pi40=2 # impact of x1 on TE
-pi41=2 # impact of x1v1 on TE
-
-
 y0=NULL #potential outcome for control units
 y1=NULL #potential outcome for treated units
 TE=NULL #true treatment effect 
 phi0=NULL
 phi1=NULL
 
-# Set up school selection parameters. (p is approximately 0.15)
-alpha0=-2
-alpha1= 0
-
 p2=NULL # school level selection probability
 s2=NULL  # s2=1 indicates school selected into sample 
 z2=NULL # z2=1 indicates a sampled school was assigned the treatment condition
-
-# Below are coefficiences for the ML logistics regression for student selection 
-tau00=-2 # unconditional selection probability 
-tau01=0 # impact of v1 on selection
-tau10=0 # impact of x1
-tau11=0 # impact of x1v1
 
 eta0=eta1=NULL
 p1=NULL
@@ -198,17 +197,44 @@ dataset=NULL
   prob_schl_long=rep(prob_schl,K) # make it into long format 
   
   # Combine all variables into a single dataset and write to file 
-  dataset=data.frame(cbind(schid,studentid,y_l,y1_l,y0_l,TE_l,s1_l,s2_l,z2_l,x1_l,v1_l,prob_schl_long))
+  dataset=data.frame(cbind(condition=j,schid,studentid,y_l,y1_l,y0_l,TE_l,s1_l,s2_l,z2_l,x1_l,v1_l,prob_schl_long))
+  datasets = rbind(datasets, dataset)
+})}
   file.name=paste0("dataset",iter,".dta")
-  write.dta(dataset,file.name)
-  message("Wrote ", iter)
-  return(NULL)
+  write.dta(datasets,file.name)
 }
-
 
 # Set random seed #
 n.sim=50
 
+# Below are coefficients for the MLM treatment effect # 
+# All other coefficients that are in the draft but not listed here are either 0 or 1 #
+pi30=1 # unconditional effect of treatment effect (TE) #
+pi31=2 # impact of v1 on TE
+pi40=2 # impact of x1 on TE
+pi41=2 # impact of x1v1 on TE
+
+# Set up school selection parameters. (p is approximately 0.15)
+alpha0=-2
+alpha1= 0
+
+# Below are coefficiences for the ML logistics regression for student selection 
+tau00=-2 # unconditional selection probability 
+tau01=0 # impact of v1 on selection
+tau10=0 # impact of x1
+tau11=0 # impact of x1v1
+
+params <- expand.grid(pi30 = 1,
+                      pi31 = c(0.2, 2),
+                      pi40 = c(0.2, 2),
+                      pi41 = c(0.2, 2),
+                      alpha0 = -2,
+                      alpha1 = c(0.2, 2),
+                      tau00 = -1,
+                      tau01 = c(0.2, 2),
+                      tau10 = c(0.2, 2),
+                      tau11 = c(0.2, 2))
+
 cl <- makeCluster(Sys.getenv()["SLURM_NTASKS"], type = "MPI")
-clusterApplyLB(cl, 1:n.sim, generate_data)
+clusterApplyLB(cl, 1:n.sim, generate_data, params)
 stopCluster(cl)
