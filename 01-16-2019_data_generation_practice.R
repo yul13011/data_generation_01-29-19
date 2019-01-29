@@ -25,7 +25,7 @@ datasets = data.frame(replicate = integer(),
 with(params[iter, ], {
 for (j in 1:n.sim) {
 # Set random seed #
-set.seed(1234566 + iter)
+set.seed(1234566 + j)
 # Step 1. Generate data #################################################################
 
 # Step 1.1. Generate school level and student level covariates # 
