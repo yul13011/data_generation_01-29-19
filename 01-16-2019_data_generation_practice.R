@@ -157,9 +157,9 @@ for (j in 1:n.sim){
     }
   }
   
-  mean(s2)  
-  hist(s1_mean[complete.cases(s1_mean)])
-  mean(s1_mean[complete.cases(s1_mean)])
+  ## mean(s2)  
+  ## hist(s1_mean[complete.cases(s1_mean)])
+  ## mean(s1_mean[complete.cases(s1_mean)])
   
   # Step 2. Saving all variables into a dataframe ####################################################### 
   
