@@ -17,7 +17,6 @@ suppressPackageStartupMessages({
     library(ggplot2)
     library(dplyr)
     library(tibble)
-    library(readr)
 })
 
 args <- commandArgs(trailingOnly = TRUE)
@@ -33,6 +32,7 @@ if (identical(args, character(0))) {
 }
 set.seed(seed)
 
+## Create invariant paramters.
 params <- expand.grid(pi30 = 1,
                       pi31 = c(0.2, 2),
                       pi40 = c(0.2, 2),
@@ -43,20 +43,29 @@ params <- expand.grid(pi30 = 1,
                       tau01 = c(0.2, 2),
                       tau10 = c(0.2, 2),
                       tau11 = c(0.2, 2)) %>%
+    ## Make it easier to interactively use.
     as_tibble() %>%
+    ## Each row is a condition.
     mutate(condition = row_number()) %>%
+    ## Move the condition column to be first.  "everything()" means
+    ## all other columns.
     select(condition, everything())
 ## BEGIN FIXME
+## For now subset the data so that we don't fill our RAM.
+## Remove the stuff between the FIXME blocks when running this on the cluster.
 params <- head(params, 3)
 H <- 20 # 2000
 ## END FIXME
 school <-
     tibble(schoolid = 1:H) %>%
+    ## To merge schools with conditions, we need to repeat the schools
+    ## as many times as we have conditions.
     replicate(nrow(params), ., simplify = FALSE) %>%
     bind_rows(.id = "condition") %>%
     ## Convert the condition column from character to integer for join.
     mutate(condition = as.integer(condition)) %>%
     inner_join(params, by = "condition") %>%
+    ## All equations should apply across all schools.
     group_by(condition) %>%
     mutate(v1 = rnorm(n(), 0, 1), # v1~N(0,1)
            v2 = as.logical(rbinom(n(), 1, 0.5))) %>%
@@ -67,9 +76,10 @@ school <-
            z2 = as.logical(rbinom(n(), 1, 0.5)), # z2=1 indicates a sampled school was assigned the treatment condition
            eta0 = tau00 + tau01 * v1 + v2, # level 2 intercept as outcome of v1
            eta1 = tau10 + tau11 * v1 + v2) # level 2 slope as outcome of v1
-## predicted school selection probability
+## Predicted school selection probability.
 fits <-
     school %>%
+    ## Split data frames to be able to run glm.
     split(pull(school, condition)) %>%
     lapply(function(x) glm(s2 ~ v1, data = x,
                            family = binomial()))
@@ -79,15 +89,17 @@ prob_schl <- lapply(fits, predict,
 school <-
     school %>%
     bind_cols(prob_schl = prob_schl)
-write_csv(school, "school.csv")
 nstudents <- as.integer(rnorm(H,200,80))
 nstudents[nstudents < 10] <- 10L
 nstudents[nstudents > 700] <- 700L
 data <-
     tibble(schoolid = rep.int(1:H, nstudents)) %>%
     inner_join(school, by = "schoolid") %>%
+    ## All equations apply to all students in each school per condition.
     group_by(schoolid, condition) %>%
+    ## Generate studentid from the group row number.
     mutate(studentid = row_number()) %>%
+    ## n() is the group size.
     mutate(K = as.integer(rnorm(n(), 200, 80)),
            ## Truncate K to [10, 700]
            K = case_when(
